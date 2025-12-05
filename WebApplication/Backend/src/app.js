@@ -15,7 +15,11 @@ app.use(express.static("public"))
 app.use(cookieParser())
 
 // Monitoring Middleware
-import { monitorRequest } from "./controllers/monitoring.controller.js";
+// Monitoring Middleware
+import { blocklistMiddleware } from "./middlewares/blocklist.middleware.js";
+import { monitorRequest } from "./middlewares/monitoring.middleware.js";
+
+app.use(blocklistMiddleware);
 app.use(monitorRequest);
 
 // routes import

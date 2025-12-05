@@ -1,1 +1,1 @@
-export const DB_NAME = "minisoc";
+export const DB_NAME = "miniSOC";

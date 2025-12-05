@@ -34,7 +34,7 @@ const logSchema = new Schema(
         },
         httpMethod: {
             type: String,
-            enum: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", null],
+            enum: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
             default: null
         },
         statusCode: {
@@ -83,5 +83,10 @@ const logSchema = new Schema(
         timestamps: true
     }
 )
+
+logSchema.index({ timestamp: -1 });
+logSchema.index({ sourceIP: 1, timestamp: -1 });
+logSchema.index({ category: 1, eventType: 1, timestamp: -1 });
+logSchema.index({ attackVector: 1, severity: 1, timestamp: -1 });
 
 export const Log = mongoose.model("Log", logSchema)
