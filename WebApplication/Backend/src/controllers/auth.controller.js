@@ -1,9 +1,9 @@
-import { Admin } from '../models/Admin.models.js';
-import { Analyst } from '../models/Analyst.model.js';
+import Admin from '../models/Admin.models.js';
+import Analyst from '../models/Analyst.models.js';
 import jwt from 'jsonwebtoken';
-import { asyncHandler } from '../utils/asyncHandler.js';
-import { ApiError } from '../utils/ApiError.js';
-import { ApiResponse } from '../utils/ApiResponse.js';
+import asyncHandler from '../utils/asyncHandler.js';
+import ApiError from '../utils/ApiError.js';
+import ApiResponse from '../utils/ApiResponse.js';
 import crypto from 'crypto';
 import { uploadOnCloudinary, deleteImageOnCloudinary } from '../utils/cloudinary.js';
 import { sendVerificationEmail } from '../utils/emailService.js';

@@ -44,4 +44,5 @@ const ruleSchema = new Schema(
 // Ensure efficiency when looking up active rules
 ruleSchema.index({ isActive: 1, category: 1 });
 
-export const Rule = mongoose.model("Rule", ruleSchema);
+const Rule = mongoose.model("Rule", ruleSchema);
+export default Rule;

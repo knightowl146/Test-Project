@@ -1,17 +1,13 @@
-import { Log } from "../models/Log.model.js";
-import { Incident } from "../models/Incident.model.js";
+import Log from "../models/Log.model.js";
+import Incident from "../models/Incident.model.js";
 import { v4 as uuidv4 } from "uuid";
 import { getIO } from "../socket.js";
 
-// Configuration
-const TIME_WINDOW_MINUTES = 5;
-const THRESHOLD_COUNT = 5; // e.g., 5 attacks in 5 minutes triggers an incident
 
-/**
- * Analyzes a log entry before saving to detect specific patterns (like failed logins).
- * Mutates the logData object in place.
- * @param {Object} logData - The log data object being prepared.
- */
+const TIME_WINDOW_MINUTES = 5;
+const THRESHOLD_COUNT = 5;
+
+
 export const analyzeLog = (logData) => {
     // Rule: Failed Login Detection (Time-based correlation elsewhere handles the "Brute Force" naming, 
     // but here we flag the individual event)
@@ -29,10 +25,7 @@ export const analyzeLog = (logData) => {
     }
 };
 
-/**
- * Analyzes a security log to determine if an incident should be created or updated.
- * @param {Object} logDoc - The Mongoose document of the newly saved log.
- */
+
 export const processLog = async (logDoc) => {
     try {
         const { sourceIP, attackVector, severity, details } = logDoc;
@@ -47,9 +40,7 @@ export const processLog = async (logDoc) => {
             timestamp: { $gte: windowStart }
         });
 
-        // console.log(`[ThreatEngine] IP: ${sourceIP}, Vector: ${attackVector}, Count: ${recentLogsCount}`);
 
-        // 2. Check Threshold
         if (recentLogsCount >= THRESHOLD_COUNT) {
             // 3. Check for existing OPEN incident for this IP
             let incident = await Incident.findOne({
@@ -63,10 +54,6 @@ export const processLog = async (logDoc) => {
                 incident.lastSeenAt = now;
                 // Add this log to relatedLogs if not already present (though logic implies it's new)
                 incident.relatedLogs.push(logDoc._id);
-
-                // Upgrade severity if needed (e.g., if new log is CRITICAL but incident was HIGH)
-                // For simplicity, we keep the highest severity seen or just keep current.
-                // Let's stick to the diagram: "update incident"
 
                 await incident.save();
                 console.log(`[ThreatEngine] Updated Incident: ${incident.incidentId}`);

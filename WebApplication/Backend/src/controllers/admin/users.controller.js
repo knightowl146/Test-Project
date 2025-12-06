@@ -1,8 +1,8 @@
-import { asyncHandler } from "../../utils/asyncHandler.js";
-import { ApiResponse } from "../../utils/ApiResponse.js";
-import { ApiError } from "../../utils/ApiError.js";
-import { Admin } from "../../models/Admin.model.js";
-import { Analyst } from "../../models/Analyst.model.js";
+import asyncHandler from "../../utils/asyncHandler.js";
+import ApiResponse from "../../utils/ApiResponse.js";
+import ApiError from "../../utils/ApiError.js";
+import Admin from "../../models/Admin.models.js";
+import Analyst from "../../models/Analyst.models.js";
 
 /**
  * @desc    Get all users (Admins + Analysts)

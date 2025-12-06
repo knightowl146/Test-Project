@@ -33,6 +33,5 @@ router.post("/update-profile-image", authMiddleware, upload.single("profilePhoto
 router.get("/verify-email", verifyEmail);
 router.post("/google-login", googleLogin);
 router.post("/google-register", upload.single("profilePhoto"), registerGoogle);
-router.get('/me', authMiddleware, getCurrentUser);
 router.get('/profile-image', authMiddleware, getProfileImage);
 export default router;

@@ -1,37 +1,33 @@
 import asyncHandler from "../utils/asyncHandler.js";
-import { Log } from "../models/Log.model.js";
+import Log from "../models/Log.model.js";
 import { v4 as uuidv4 } from "uuid";
 
 import { processLog, analyzeLog } from "../utils/threatEngine.js";
 import { getIO } from "../socket.js";
 import geoip from 'geoip-lite';
 
-// Configuration for Active Defense
-const BLOCK_MODE = true; // Set to true to enable blocking (IPS mode)
+
+const BLOCK_MODE = true;
 
 export const monitorRequest = asyncHandler(async (req, res, next) => {
     const start = Date.now();
     const requestId = uuidv4();
 
-    // --- Phase 0: Filtering Noisy Requests ---
-    // --- Phase 0: Filtering Noisy Requests ---
-    // TEMPORARY: Only log 'login' requests to stop log explosion
-    // In production, we would want broader logging, but filtering out polling is enough.
-    // For now, adhering to user request: "create logs only for login request"
+
     if (!req.originalUrl.includes("/login")) {
         return next();
     }
 
-    // --- Phase 1: Capture Request ---
+
     const contentLengthIn = req.get("content-length");
     const bytesIn = contentLengthIn ? parseInt(contentLengthIn, 10) : 0;
 
     // Resolve IP to Geo Location
-    // In local dev, localhost IPs won't resolve, so we can mock or just handle null
+
     const ip = req.ip || req.connection.remoteAddress;
     let geo = geoip.lookup(ip);
 
-    // --- MOCK GEO FOR LOCALHOST (DEV ONLY) ---
+    // --- MOCK GEO FOR LOCALHOST 
     if (!geo && (ip === "::1" || ip === "127.0.0.1" || ip.includes("192.168"))) {
         // Generate random coordinates for visualization
         // Lat: -90 to 90, Lon: -180 to 180
@@ -51,11 +47,11 @@ export const monitorRequest = asyncHandler(async (req, res, next) => {
         timestamp: new Date(),
         sourceIP: ip,
         sourceType: "APP",
-        userId: null, // will be filled in finish if req.user exists
+        userId: null,
         targetSystem: "Mini-SOC-Backend",
         endpoint: req.originalUrl,
         httpMethod: req.method,
-        statusCode: 0, // will set in finish
+        statusCode: 0,
         category: "REQUEST",
         eventType: "HTTP_REQUEST",
         severity: "LOW",
@@ -82,7 +78,7 @@ export const monitorRequest = asyncHandler(async (req, res, next) => {
         }
     };
 
-    // --- Phase 2: Detection (Signatures) ---
+
     const bodyString = JSON.stringify(req.body || {}).toLowerCase();
     const queryParams = JSON.stringify(req.query || {}).toLowerCase();
     const urlString = req.originalUrl.toLowerCase();
@@ -164,11 +160,11 @@ export const monitorRequest = asyncHandler(async (req, res, next) => {
         logData.details.tags.push(detectedThreat.type);
     }
 
-    // --- Phase 3: Attach "finish" listener ---
+
     res.on("finish", async () => {
         const duration = Date.now() - start;
 
-        // If JWT auth ran, we can pick the final userId here
+
         logData.userId = req.user?.id || null;
 
         logData.statusCode = res.statusCode;
@@ -179,23 +175,22 @@ export const monitorRequest = asyncHandler(async (req, res, next) => {
             logData.details.bytesOut = parseInt(contentLengthOut, 10);
         }
 
-        // --- Centralized Threat Analysis (e.g., Failed Logins) ---
+
         analyzeLog(logData);
 
         try {
-            // SAVE Log into MongoDB
+
             const savedLog = await Log.create(logData);
 
-            // REAL-TIME: Emit new log event
+
             try {
                 getIO().emit("NEW_LOG", savedLog);
             } catch (socketError) {
                 console.error("Socket emit failed:", socketError.message);
             }
 
-            // IF SECURITY LOG -> call ThreatEngine
+
             if (logData.category === "SECURITY") {
-                // Call ThreatEngine asynchronously (fire and forget from request perspective)
                 processLog(savedLog);
             }
         } catch (error) {
@@ -203,7 +198,7 @@ export const monitorRequest = asyncHandler(async (req, res, next) => {
         }
     });
 
-    // --- Condition: Block or Next ---
+    // Block or Next ---
     if (BLOCK_MODE && detectedThreat) {
         // RETURN 403 (block request)
         return res.status(403).json({
@@ -212,7 +207,7 @@ export const monitorRequest = asyncHandler(async (req, res, next) => {
             reason: `${detectedThreat.type} attempt blocked`,
             requestId: requestId
         });
-        // Note: The 'finish' listener above will still execute when this response finishes, saving the log.
+
     } else {
         next();
     }

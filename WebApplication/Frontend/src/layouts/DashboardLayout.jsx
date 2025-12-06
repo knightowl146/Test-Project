@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import api from '../utils/api';
+import { useAuth } from '../utils/authContext';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { SocketProvider } from '../context/SocketContext';
 import { LayoutDashboard, ScrollText, AlertTriangle, LogOut, Activity, User, Menu, X } from 'lucide-react';
@@ -7,6 +8,7 @@ import { LayoutDashboard, ScrollText, AlertTriangle, LogOut, Activity, User, Men
 import socLogo from '../assets/soc-logo.png';
 
 const DashboardLayout = () => {
+    const { isAuthenticated, loading: authLoading } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -15,8 +17,9 @@ const DashboardLayout = () => {
 
     React.useEffect(() => {
         const verifyUser = async () => {
-            const token = localStorage.getItem("token");
-            if (!token) {
+            if (authLoading) return;
+
+            if (!isAuthenticated) {
                 navigate("/login");
                 return;
             }
@@ -25,11 +28,12 @@ const DashboardLayout = () => {
                 // Fetch fresh user data from backend
                 const { data } = await api.get("/auth/me");
                 if (data.success) {
-                    if (data.user.role !== 'analyst') {
+                    console.log(data)
+                    if (data.data.role !== 'analyst') {
                         // Redirect non-analysts
                         navigate("/");
                     } else {
-                        setUser(data.user);
+                        setUser(data.data);
                         setLoading(false);
                     }
                 } else {
@@ -37,13 +41,12 @@ const DashboardLayout = () => {
                 }
             } catch (error) {
                 console.error("Auth check failed:", error);
-                localStorage.removeItem("token");
-                navigate("/login");
+                // navigate("/login"); // Context handles auth state, but we might want to redirect if fetching user fails
             }
         };
 
         verifyUser();
-    }, [navigate]);
+    }, [isAuthenticated, authLoading, navigate]);
 
     const handleLogout = () => {
         localStorage.removeItem("token");

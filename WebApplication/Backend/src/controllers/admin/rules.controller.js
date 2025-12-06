@@ -1,7 +1,7 @@
-import { asyncHandler } from "../../utils/asyncHandler.js";
-import { ApiResponse } from "../../utils/ApiResponse.js";
-import { ApiError } from "../../utils/ApiError.js";
-import { Rule } from "../../models/Rule.model.js";
+import asyncHandler from "../../utils/asyncHandler.js";
+import ApiResponse from "../../utils/ApiResponse.js";
+import ApiError from "../../utils/ApiError.js";
+import Rule from "../../models/Rule.model.js";
 
 /**
  * @desc    Create a new detection rule

@@ -204,20 +204,24 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { useAuth } from "../../../utils/authContext";
+import useUser from "../../../hooks/useUser";
 import api from "../../../utils/api";
 
 const Header = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { isAuthenticated, logout, user, loading } = useAuth();
+    const { isAuthenticated, logout, loading: authLoading } = useAuth();
+    const { user, loading: userLoading } = useUser();
     const [profileImage, setProfileImage] = useState(null);
 
+    // Combine loading states
+    const loading = authLoading || userLoading;
+
     useEffect(() => {
-        if (isAuthenticated && user) {
-            // Set initial image from user object
+        if (user) {
             setProfileImage(user.profilePhoto);
 
-            // Allow fetching fresh image if needed, or rely on user object
+            // Allow fetching fresh image if needed
             const fetchProfileImage = async () => {
                 try {
                     const res = await api.get('/auth/profile-image');
@@ -229,8 +233,10 @@ const Header = () => {
                 }
             };
             fetchProfileImage();
+        } else {
+            setProfileImage(null);
         }
-    }, [isAuthenticated, user]);
+    }, [user]);
 
     const handleTherapiesClick = (e) => {
         if (location.pathname === "/") {
@@ -254,7 +260,7 @@ const Header = () => {
 
     const handleDashboardClick = () => {
         if (isAuthenticated) {
-            navigate('/dashboard');
+            navigate(user?.role === 'admin' ? '/admin' : '/dashboard');
         }
     };
 
@@ -308,7 +314,7 @@ const Header = () => {
                     {/* Dashboard Link (only show when authenticated) */}
                     {isAuthenticated && (
                         <Link
-                            to="/dashboard"
+                            to={user?.role === 'admin' ? "/admin" : "/dashboard"}
                             className={`text-lg font-semibold transition-colors duration-200 ${navLinkText}`}
                         >
                             Dashboard

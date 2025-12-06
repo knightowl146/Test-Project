@@ -1,10 +1,10 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../../utils/authContext";
+import useUser from "../../../hooks/useUser";
 
 const HomePage = () => {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user } = useUser();
 
     return (
         <div className="min-h-screen w-full bg-[#071529] text-white px-6 py-10">

@@ -1,7 +1,7 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import ApiError from "../utils/ApiError.js";
-import { Incident } from "../models/Incident.model.js";
+import Incident from "../models/Incident.model.js";
 
 // Utility for checking valid severity/status enums
 const VALID_STATUSES = ["OPEN", "IN_PROGRESS", "CLOSED_TRUE_POSITIVE", "CLOSED_FALSE_POSITIVE"];
@@ -63,7 +63,7 @@ const getIncidents = asyncHandler(async (req, res) => {
 
 const assignIncident = asyncHandler(async (req, res) => {
     const { incidentId } = req.params;
-    const user = req.user; // From auth middleware
+    const user = req.user;
 
     const incident = await Incident.findOne({ incidentId });
 
@@ -71,7 +71,7 @@ const assignIncident = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Incident not found");
     }
 
-    // Check if already assigned
+
     if (incident.assignedTo && incident.assignedTo !== user.username) {
         throw new ApiError(403, `Incident is already assigned to ${incident.assignedTo}. Only admins can reassign.`);
     }
@@ -116,9 +116,7 @@ const unassignIncident = asyncHandler(async (req, res) => {
     );
 });
 
-/**
- * Endpoint to handle Incident Triage (updating status, assignment, and notes).
- */
+
 const triageIncident = asyncHandler(async (req, res) => {
     const { incidentId } = req.params;
     const { status, assignedTo, analystNotes, newSeverity } = req.body;
@@ -135,7 +133,7 @@ const triageIncident = asyncHandler(async (req, res) => {
     const updateFields = {};
     const currentStatus = incident.status;
 
-    // 2. Status Update
+
     if (status && VALID_STATUSES.includes(status.toUpperCase())) {
         const newStatus = status.toUpperCase();
         if (newStatus === "IN_PROGRESS" && !incident.assignedTo && !assignedTo) {

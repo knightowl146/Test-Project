@@ -41,4 +41,5 @@ const blocklistSchema = new Schema(
 // blocklistSchema.index({ ip: 1 });
 blocklistSchema.index({ isActive: 1 });
 
-export const Blocklist = mongoose.model("Blocklist", blocklistSchema);
+const Blocklist = mongoose.model("Blocklist", blocklistSchema);
+export default Blocklist;

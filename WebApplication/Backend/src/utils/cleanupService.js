@@ -1,4 +1,4 @@
-import { Log } from "../models/Log.model.js";
+import Log from "../models/Log.model.js";
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // Run every 1 hour
 const RETENTION_PERIOD_HOURS = 12;

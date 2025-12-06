@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import api from '../utils/api';
+import { useAuth } from '../utils/authContext';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Shield, FileText, Activity, Lock, BookOpen, AlertCircle, LogOut, Menu, X, Users, Settings } from 'lucide-react';
 
 import socLogo from '../assets/soc-logo.png';
 
 const AdminLayout = () => {
+    const { isAuthenticated, loading: authLoading, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -14,8 +16,9 @@ const AdminLayout = () => {
 
     React.useEffect(() => {
         const verifyAdmin = async () => {
-            const token = localStorage.getItem("token");
-            if (!token) {
+            if (authLoading) return;
+
+            if (!isAuthenticated) {
                 navigate("/login");
                 return;
             }
@@ -23,7 +26,7 @@ const AdminLayout = () => {
             try {
                 const { data } = await api.get("/auth/me");
                 if (data.success) {
-                    if (data.user.role !== 'admin') {
+                    if (data.data.role !== 'admin') {
                         // Redirect non-admins to their dashboard or home
                         if (data.user.role === 'analyst') {
                             navigate("/dashboard");
@@ -31,7 +34,7 @@ const AdminLayout = () => {
                             navigate("/");
                         }
                     } else {
-                        setUser(data.user);
+                        setUser(data.data);
                         setLoading(false);
                     }
                 } else {
@@ -39,17 +42,15 @@ const AdminLayout = () => {
                 }
             } catch (error) {
                 console.error("Auth check failed:", error);
-                localStorage.removeItem("token");
-                navigate("/login");
+                // navigate("/login"); // Auth context handles logout state
             }
         };
 
         verifyAdmin();
-    }, [navigate]);
+    }, [isAuthenticated, authLoading, navigate]);
 
     const handleLogout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        logout();
         navigate("/login");
     }
 
