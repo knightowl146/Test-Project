@@ -1,4 +1,4 @@
-import { Blocklist } from "../models/Blocklist.model.js";
+import Blocklist from "../models/Blocklist.model.js";
 
 export const blocklistMiddleware = async (req, res, next) => {
     // try to get real client IP

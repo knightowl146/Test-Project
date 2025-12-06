@@ -36,3 +36,14 @@ export const authMiddleware = asyncHandler(async (req, res, next) => {
         throw new ApiError(401, error?.message || 'Invalid access token');
     }
 });
+
+export const verifyJWT = authMiddleware;
+
+export const authorizeRoles = (...roles) => {
+    return (req, res, next) => {
+        if (!req.user || !roles.includes(req.user.role)) {
+            return next(new ApiError(403, `User role '${req.user.role}' is not authorized to access this resource`));
+        }
+        next();
+    };
+};

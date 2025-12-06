@@ -1,8 +1,15 @@
 import { Router } from "express";
-import { createLog, getLogs } from "../controllers/log.controller.js";
+import { createLog, getLogs, getLogStats } from "../controllers/log.controller.js";
+import { verifyJWT, authorizeRoles } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.route("/").post(createLog).get(getLogs);
+// Allow public log creation (e.g., for attacker module without auth)
+router.post("/", createLog);
+
+// Protect fetching routes
+router.use(verifyJWT);
+router.get("/", authorizeRoles("admin", "analyst"), getLogs);
+router.get("/stats", authorizeRoles("admin", "analyst"), getLogStats);
 
 export default router;

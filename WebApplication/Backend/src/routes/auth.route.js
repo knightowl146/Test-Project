@@ -1,4 +1,5 @@
 import express from 'express';
+import { verifyJWT } from '../middlewares/auth.middleware.js';
 import {
     registerAnalyst,
     registerAdmin,
@@ -23,6 +24,7 @@ router.post("/register/analyst", upload.single("profilePhoto"), registerAnalyst)
 router.post("/register/admin", upload.single("profilePhoto"), registerAdmin);
 router.post('/login', login);
 router.post('/refresh-token', refreshAccessToken);
+router.get('/me', verifyJWT, getCurrentUser);
 
 // Protected routes
 router.post('/logout', authMiddleware, logout);
@@ -31,6 +33,5 @@ router.post("/update-profile-image", authMiddleware, upload.single("profilePhoto
 router.get("/verify-email", verifyEmail);
 router.post("/google-login", googleLogin);
 router.post("/google-register", upload.single("profilePhoto"), registerGoogle);
-router.get('/me', authMiddleware, getCurrentUser);
 router.get('/profile-image', authMiddleware, getProfileImage);
 export default router;

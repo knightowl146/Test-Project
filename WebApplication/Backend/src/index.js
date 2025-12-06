@@ -6,9 +6,17 @@ dotenv.config({
     path: './.env'
 })
 
+import { createServer } from "http";
+import { initSocket } from "./socket.js";
+import { startLogCleanup } from "./utils/cleanupService.js";
+
 connectDB()
     .then(() => {
-        app.listen(process.env.PORT || 8000, () => {
+        const server = createServer(app);
+        initSocket(server);
+        startLogCleanup();
+
+        server.listen(process.env.PORT || 8000, () => {
             console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
         })
     })

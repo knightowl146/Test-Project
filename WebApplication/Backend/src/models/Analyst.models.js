@@ -27,6 +27,13 @@ const analystSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Phone number is required']
     },
+    assignedIncidents: [{
+        type: String // Incident IDs
+    }],
+    specialization: {
+        type: String, // e.g., 'Forensics', 'Network', 'Triage'
+        default: 'General'
+    },
     refreshToken: { type: String, default: null },
     profilePhoto: {
         type: String,

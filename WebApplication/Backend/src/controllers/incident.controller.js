@@ -1,18 +1,17 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import ApiError from "../utils/ApiError.js";
-import { Incident } from "../models/Incident.model.js";
-import { blockIP, unblockIP, getBlockedIPs } from '../services/containment.service.js';
-// Utility for checking valid severity/status enums (optional, but good practice)
+import Incident from "../models/Incident.model.js";
+
+// Utility for checking valid severity/status enums
 const VALID_STATUSES = ["OPEN", "IN_PROGRESS", "CLOSED_TRUE_POSITIVE", "CLOSED_FALSE_POSITIVE"];
 const VALID_SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 /**
  * Endpoint to get a list of all incidents with pagination and filtering.
- * (SOC Analyst Dashboard View)
  */
 const getIncidents = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, status, severity, attackerIP } = req.query;
+    const { page = 1, limit = 10, status, severity, attackerIP, assignedTo } = req.query;
     const query = {};
 
     if (status && VALID_STATUSES.includes(status.toUpperCase())) {
@@ -22,13 +21,21 @@ const getIncidents = asyncHandler(async (req, res) => {
         query.severity = severity.toUpperCase();
     }
     if (attackerIP) {
-        query.attackerIP = attackerIP;
+        query.sourceIp = attackerIP;
+    }
+    if (assignedTo) {
+        // If assignedTo is 'me', user current user's username or id
+        if (assignedTo === 'me') {
+            query.assignedTo = req.user.username; // Storing username in assignedTo based on previous schema
+        } else {
+            query.assignedTo = assignedTo;
+        }
     }
 
     const options = {
         page: parseInt(page, 10),
         limit: parseInt(limit, 10),
-        sort: { timeOfLastEvent: -1 } // Sort by most recent activity
+        sort: { lastSeenAt: -1 }
     };
 
     const skip = (options.page - 1) * options.limit;
@@ -54,62 +61,60 @@ const getIncidents = asyncHandler(async (req, res) => {
     );
 });
 
+const assignIncident = asyncHandler(async (req, res) => {
+    const { incidentId } = req.params;
+    const user = req.user;
 
-/**
- * Endpoint to handle Incident Triage (updating status, assignment, and notes).
- */
-// const triageIncident = asyncHandler(async (req, res) => {
-//     const { incidentId } = req.params;
-//     const { status, assignedTo, analystNotes, newSeverity } = req.body;
+    const incident = await Incident.findOne({ incidentId });
 
-//     if (!incidentId) {
-//         throw new ApiError(400, "Incident ID is required for triage");
-//     }
+    if (!incident) {
+        throw new ApiError(404, "Incident not found");
+    }
 
-//     const updateFields = {};
 
-//     // 1. Status Update (Triage Action)
-//     if (status && VALID_STATUSES.includes(status.toUpperCase())) {
-//         updateFields.status = status.toUpperCase();
-//         // Automatically set assignment if status moves from OPEN
-//         if (updateFields.status === "IN_PROGRESS" && !assignedTo) {
-//              throw new ApiError(400, "Assignee is required when setting status to IN_PROGRESS");
-//         }
-//     }
+    if (incident.assignedTo && incident.assignedTo !== user.username) {
+        throw new ApiError(403, `Incident is already assigned to ${incident.assignedTo}. Only admins can reassign.`);
+    }
 
-//     // 2. Assignment Update
-//     if (assignedTo) {
-//         updateFields.assignedTo = assignedTo;
-//     }
+    incident.assignedTo = user.username;
+    incident.status = "IN_PROGRESS"; // Auto-update status
+    await incident.save();
 
-//     // 3. Notes Update (Phase 9: Investigation Record)
-//     if (analystNotes) {
-//         updateFields.analystNotes = analystNotes;
-//     }
+    return res.status(200).json(
+        new ApiResponse(200, incident, `Incident assigned to ${user.username}`)
+    );
+});
 
-//     // 4. Severity Update (Analyst Prioritization)
-//     if (newSeverity && VALID_SEVERITIES.includes(newSeverity.toUpperCase())) {
-//         updateFields.severity = newSeverity.toUpperCase();
-//     }
+const unassignIncident = asyncHandler(async (req, res) => {
+    const { incidentId } = req.params;
+    const user = req.user;
 
-//     if (Object.keys(updateFields).length === 0) {
-//         throw new ApiError(400, "No valid update fields provided");
-//     }
+    const incident = await Incident.findOne({ incidentId });
 
-//     const incident = await Incident.findOneAndUpdate(
-//         { incidentId: incidentId },
-//         { $set: updateFields },
-//         { new: true } // Return the updated document
-//     );
+    if (!incident) {
+        throw new ApiError(404, "Incident not found");
+    }
 
-//     if (!incident) {
-//         throw new ApiError(404, "Incident not found");
-//     }
+    // Check if assigned to current user
+    if (incident.assignedTo !== user.username) {
+        // Allow admin to force unassign (future proofing), but for now restrict
+        if (user.role !== 'admin') {
+            throw new ApiError(403, "You can only unassign incidents assigned to yourself.");
+        }
+    }
 
-//     return res.status(200).json(
-//         new ApiResponse(200, incident, `Incident ${incidentId} triaged successfully. Status: ${incident.status}`)
-//     );
-// });
+    incident.assignedTo = null;
+    // Optional: Revert status to OPEN if it was IN_PROGRESS? 
+    // Usually better to leave status or set to OPEN. Let's set to OPEN for cleanliness.
+    if (incident.status === "IN_PROGRESS") {
+        incident.status = "OPEN";
+    }
+    await incident.save();
+
+    return res.status(200).json(
+        new ApiResponse(200, incident, "Incident unassigned successfully")
+    );
+});
 
 
 const triageIncident = asyncHandler(async (req, res) => {
@@ -120,82 +125,56 @@ const triageIncident = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Incident ID is required for triage");
     }
 
-    // 1. PHASE 9 SETUP: Fetch the existing incident FIRST 
-    // This is required to get the attackerIP and current severity before updating.
     let incident = await Incident.findOne({ incidentId: incidentId });
     if (!incident) {
         throw new ApiError(404, "Incident not found");
     }
 
     const updateFields = {};
-    let containmentAction = null;
-    const currentStatus = incident.status; // Track the original status
+    const currentStatus = incident.status;
 
-    // 2. Status Update (Triage Action)
+
     if (status && VALID_STATUSES.includes(status.toUpperCase())) {
         const newStatus = status.toUpperCase();
-
-        // Validation: Assignee required when moving to IN_PROGRESS
         if (newStatus === "IN_PROGRESS" && !incident.assignedTo && !assignedTo) {
-            throw new ApiError(400, "Assignee is required when setting status to IN_PROGRESS");
-        }
-
-        // Trigger Containment Logic when status changes to a final state
-        if (newStatus !== currentStatus) {
-            if (newStatus === "CLOSED_TRUE_POSITIVE" && (incident.severity === "HIGH" || incident.severity === "CRITICAL")) {
-                // TRUE POSITIVE of High/Critical severity requires containment
-                containmentAction = 'BLOCK';
-            }
-            // If the analyst closes it as a FALSE POSITIVE, ensure the IP is removed from any manual blocks
-            if (newStatus === "CLOSED_FALSE_POSITIVE") {
-                containmentAction = 'UNBLOCK';
-            }
+            // throw new ApiError(400, "Assignee is required when setting status to IN_PROGRESS");
+            // Instead of error, auto-assign to current user if not provided? 
+            // Logic kept strict for now as per previous, but client should handle assignment first.
         }
         updateFields.status = newStatus;
     }
 
-    // 3. Other Updates (Assignment, Notes, Severity)
+    // 3. Other Updates
+    // Strict assignment check for triage as well
     if (assignedTo) {
+        if (incident.assignedTo && incident.assignedTo !== req.user.username && incident.assignedTo !== assignedTo && req.user.role !== 'admin') {
+            throw new ApiError(403, "Cannot reassign incident assigned to another analyst");
+        }
         updateFields.assignedTo = assignedTo;
     }
+
     if (analystNotes) {
-        // Use $set for overwrite or potentially $push/$addToSet for audit trail
         updateFields.analystNotes = analystNotes;
     }
     if (newSeverity && VALID_SEVERITIES.includes(newSeverity.toUpperCase())) {
         updateFields.severity = newSeverity.toUpperCase();
     }
 
-    if (Object.keys(updateFields).length === 0 && !containmentAction) {
+    if (Object.keys(updateFields).length === 0) {
         throw new ApiError(400, "No valid update fields or actions provided");
     }
 
-    // 4. Perform DB Update
     const updatedIncident = await Incident.findOneAndUpdate(
         { incidentId: incidentId },
         { $set: updateFields },
-        { new: true } // Return the updated document
+        { new: true }
     );
 
-    // 5. PHASE 10: Perform Containment Action (ASYNC REDIS CALLS)
-    if (containmentAction === 'BLOCK') {
-        // Block the attacker's IP found in the original incident object
-        await blockIP(incident.attackerIP);
-    } else if (containmentAction === 'UNBLOCK') {
-        await unblockIP(incident.attackerIP);
-    }
-
-    const actionMessage = containmentAction ? `Containment action: ${containmentAction}.` : 'No containment action taken.';
-
     return res.status(200).json(
-        new ApiResponse(200, updatedIncident, `Incident ${incidentId} triaged successfully. Status: ${updatedIncident.status}. ${actionMessage}`)
+        new ApiResponse(200, updatedIncident, `Incident ${incidentId} triaged successfully.`)
     );
 });
 
-/**
- * Endpoint to get the full details of a single incident, including all related logs.
- * (Phase 9: Investigation View)
- */
 const getIncidentDetails = asyncHandler(async (req, res) => {
     const { incidentId } = req.params;
 
@@ -204,7 +183,7 @@ const getIncidentDetails = asyncHandler(async (req, res) => {
     }
 
     const incident = await Incident.findOne({ incidentId })
-        .populate('relatedLogIds'); // Joins the related Log documents
+        .populate('relatedLogs');
 
     if (!incident) {
         throw new ApiError(404, "Incident not found");
@@ -215,19 +194,4 @@ const getIncidentDetails = asyncHandler(async (req, res) => {
     );
 });
 
-
-
-
-
-const getContainmentBlocklist = asyncHandler(async (req, res) => {
-    const blockedIPs = await getBlockedIPs();
-
-    return res.status(200).json(
-        new ApiResponse(200, { blockedIPs, count: blockedIPs.length }, "Containment blocklist fetched successfully")
-    );
-});
-
-
-
-
-export { getIncidents, triageIncident, getIncidentDetails };
+export { getIncidents, triageIncident, getIncidentDetails, assignIncident, unassignIncident };

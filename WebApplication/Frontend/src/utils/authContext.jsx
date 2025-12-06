@@ -4,7 +4,6 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -20,17 +19,11 @@ export const AuthProvider = ({ children }) => {
             if (response.ok) {
                 const data = await response.json();
                 setIsAuthenticated(data.data.isAuthenticated);
-                if (data.data.isAuthenticated) {
-                    // You might want to fetch user details here
-                    setUser(data.data.user || { role: 'patient' }); // Default role for demo
-                }
             } else {
                 setIsAuthenticated(false);
-                setUser(null);
             }
         } catch (error) {
             setIsAuthenticated(false);
-            setUser(null);
         } finally {
             setLoading(false);
         }
@@ -50,11 +43,10 @@ export const AuthProvider = ({ children }) => {
             if (response.ok && data.success) {
                 const responseData = data.data;
                 localStorage.setItem("token", responseData.accessToken);
-                localStorage.setItem("user", JSON.stringify(responseData.user));
+                // User requested NOT to store user info in context/localstorage here, just auth state
 
                 setIsAuthenticated(true);
-                setUser(responseData.user);
-                return { success: true, user: responseData.user };
+                return { success: true };
             }
             return { success: false, error: data.message || 'Login failed' };
         } catch (error) {
@@ -62,9 +54,8 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const autoLogin = (userData) => {
+    const autoLogin = () => {
         setIsAuthenticated(true);
-        setUser(userData);
     };
 
     const logout = async () => {
@@ -77,7 +68,7 @@ export const AuthProvider = ({ children }) => {
             console.error('Logout error:', error);
         } finally {
             setIsAuthenticated(false);
-            setUser(null);
+            localStorage.removeItem("token");
         }
     };
 
@@ -99,6 +90,7 @@ export const AuthProvider = ({ children }) => {
             return { success: false, error: 'Network error or server unreachable.' };
         }
     };
+
     const loginWithOTP = async (email, otp, role) => {
         try {
             let endpoint = '';
@@ -106,7 +98,7 @@ export const AuthProvider = ({ children }) => {
                 endpoint = '/auth/login/patient-with-otp';
             } else if (role === 'practitioner') {
                 endpoint = '/auth/login/practitioner-with-otp';
-            } else if (role === 'admin') { // ⬅️ ADDED ADMIN LOGIC
+            } else if (role === 'admin') {
                 endpoint = '/auth/login/admin-with-otp';
             } else {
                 return { success: false, error: 'OTP login not supported for this role.' };
@@ -122,15 +114,12 @@ export const AuthProvider = ({ children }) => {
             const data = await response.json();
 
             if (response.ok) {
-                // Assuming this function is inside AuthProvider
                 setIsAuthenticated(true);
-                setUser(data.data.user);
                 return { success: true, user: data.data.user };
             }
 
             return { success: false, error: data.message || 'OTP verification failed.' };
         } catch (error) {
-            // Catch network errors
             return { success: false, error: error.message };
         }
     };
@@ -138,7 +127,6 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={{
             isAuthenticated,
-            user,
             login,
             logout,
             autoLogin,

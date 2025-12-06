@@ -64,4 +64,5 @@ incidentSchema.index({ status: 1, severity: -1 });
 incidentSchema.index({ sourceIp: 1 });
 incidentSchema.index({ createdAt: -1 });
 
-export const Incident = mongoose.model("Incident", incidentSchema);
+const Incident = mongoose.model("Incident", incidentSchema);
+export default Incident;

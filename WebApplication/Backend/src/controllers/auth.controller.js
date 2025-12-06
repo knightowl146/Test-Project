@@ -1,12 +1,13 @@
-import jwt from 'jsonwebtoken';
-import asyncHandler from '../utils/asyncHandler.js';
-import ApiResponse from '../utils/ApiResponse.js';
-import ApiError from '../utils/ApiError.js';
-import crypto from 'crypto';
-import { uploadOnCloudinary, deleteImageOnCloudinary } from '../utils/cloudinary.js';
 import Admin from '../models/Admin.models.js';
 import Analyst from '../models/Analyst.models.js';
+import jwt from 'jsonwebtoken';
+import asyncHandler from '../utils/asyncHandler.js';
+import ApiError from '../utils/ApiError.js';
+import ApiResponse from '../utils/ApiResponse.js';
+import crypto from 'crypto';
+import { uploadOnCloudinary, deleteImageOnCloudinary } from '../utils/cloudinary.js';
 import { sendVerificationEmail } from '../utils/emailService.js';
+
 
 const generateEmailVerificationToken = () => {
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -15,8 +16,19 @@ const generateEmailVerificationToken = () => {
     return { verificationToken, verificationTokenExpires };
 };
 
+const generateAccessAndRefereshTokens = async (user) => {
+    try {
+        const accessToken = user.generateAccessToken();
+        const refreshToken = user.generateRefreshToken();
 
+        user.refreshToken = refreshToken;
+        await user.save({ validateBeforeSave: false });
 
+        return { accessToken, refreshToken };
+    } catch (error) {
+        throw new ApiError(500, "Something went wrong while generating referesh and access token");
+    }
+};
 
 const setTokenCookies = (res, accessToken, refreshToken) => {
     const options = {
@@ -34,46 +46,6 @@ const clearTokenCookies = (res) => {
     res.clearCookie('refreshToken');
 };
 
-// export const registerAnalyst = asyncHandler(async (req, res) => {
-//     const { name, email, phone_no, password } = req.body;
-
-//     if (!name || !email || !phone_no || !password) {
-//         throw new ApiError(400, "All fields are required");
-//     }
-
-//     const existingUser = await Analyst.findOne({ $or: [{ email }, { phone_no }] });
-//     if (existingUser) throw new ApiError(400, 'Analyst with this email or phone already exists');
-
-//     let profilePhotoUrl = "https://res.cloudinary.com/famly/image/upload/v1759747438/default-profile-image_p9e5ln.jpg";
-
-//     if (req.file?.path) {
-//         const uploadRes = await uploadOnCloudinary(req.file.path, "image");
-//         if (uploadRes?.secure_url) {
-//             profilePhotoUrl = uploadRes.secure_url;
-//         }
-//     }
-
-//     const user = await Analyst.create({
-//         name,
-//         email,
-//         phone_no,
-//         passwordHash: password, // Will be hashed by pre-save hook
-//         profilePhoto: profilePhotoUrl,
-//         role: 'analyst'
-//     });
-
-//     const accessToken = user.generateAccessToken();
-//     const refreshToken = user.generateRefreshToken();
-//     await user.storeRefreshToken(refreshToken);
-
-//     setTokenCookies(res, accessToken, refreshToken);
-
-//     return res.status(201).json(new ApiResponse(201, {
-//         user: { _id: user._id, name: user.name, email: user.email, role: user.role, profilePhoto: user.profilePhoto },
-//         accessToken,
-//         refreshToken
-//     }, "Analyst registered successfully"));
-// });
 
 export const registerAnalyst = asyncHandler(async (req, res) => {
     const { name, email, phone_no, password } = req.body;
@@ -127,47 +99,6 @@ export const registerAnalyst = asyncHandler(async (req, res) => {
         }, "Analyst registered. Please verify your email to activate your account.")
     );
 });
-
-// export const registerAdmin = asyncHandler(async (req, res) => {
-//     const { name, email, phone_no, password } = req.body;
-
-//     if (!name || !email || !phone_no || !password) {
-//         throw new ApiError(400, "All fields are required");
-//     }
-
-//     const existingUser = await Admin.findOne({ $or: [{ email }, { phone_no }] });
-//     if (existingUser) throw new ApiError(400, 'Admin with this email or phone already exists');
-
-//     let profilePhotoUrl = "https://res.cloudinary.com/famly/image/upload/v1759747438/default-profile-image_p9e5ln.jpg";
-
-//     if (req.file?.path) {
-//         const uploadRes = await uploadOnCloudinary(req.file.path, "image");
-//         if (uploadRes?.secure_url) {
-//             profilePhotoUrl = uploadRes.secure_url;
-//         }
-//     }
-
-//     const user = await Admin.create({
-//         name,
-//         email,
-//         phone_no,
-//         passwordHash: password,
-//         profilePhoto: profilePhotoUrl,
-//         role: 'admin'
-//     });
-
-//     const accessToken = user.generateAccessToken();
-//     const refreshToken = user.generateRefreshToken();
-//     await user.storeRefreshToken(refreshToken);
-
-//     setTokenCookies(res, accessToken, refreshToken);
-
-//     return res.status(201).json(new ApiResponse(201, {
-//         user: { _id: user._id, name: user.name, email: user.email, role: user.role, profilePhoto: user.profilePhoto },
-//         accessToken,
-//         refreshToken
-//     }, "Admin registered successfully"));
-// });
 
 export const registerAdmin = asyncHandler(async (req, res) => {
     const { name, email, phone_no, password } = req.body;
@@ -287,6 +218,12 @@ export const logout = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, {}, "User logged out successfully"));
 });
 
+export const getCurrentUser = asyncHandler(async (req, res) => {
+    const user = await req.user.constructor.findById(req.user._id).select('-passwordHash -refreshToken');
+    res.status(200).json(new ApiResponse(200, user, "Current user fetched successfully"));
+});
+
+
 export const refreshAccessToken = asyncHandler(async (req, res) => {
     const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken;
 
@@ -330,6 +267,7 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
         throw new ApiError(401, error?.message || "Invalid refresh token");
     }
 });
+
 
 export const verifyAuth = asyncHandler(async (req, res) => {
     const token = req.cookies?.accessToken || req.header('Authorization')?.replace('Bearer ', '');
@@ -489,12 +427,6 @@ export const registerGoogle = asyncHandler(async (req, res) => {
         accessToken,
         refreshToken
     }, "Google registration successful"));
-});
-
-
-export const getCurrentUser = asyncHandler(async (req, res) => {
-    const user = await req.user.constructor.findById(req.user._id).select('-passwordHash -refreshToken');
-    res.status(200).json(new ApiResponse(200, user, "Current user fetched successfully"));
 });
 
 
