@@ -1,44 +1,93 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import api from '../utils/api';
 import { useSocket } from '../context/SocketContext';
-import { X } from 'lucide-react';
+import { X, Loader } from 'lucide-react';
 
 const LiveLogs = () => {
     const [logs, setLogs] = useState([]);
     const [selectedLog, setSelectedLog] = useState(null);
     const [filters, setFilters] = useState({ severity: '', category: '' });
-    const { socket, isConnected } = useSocket();
+    const { socket } = useSocket();
 
-    const fetchLogs = async () => {
+    // Pagination State
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const observer = useRef();
+
+    const lastLogElementRef = useCallback(node => {
+        if (loading) return;
+        if (observer.current) observer.current.disconnect();
+        observer.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMore) {
+                setPage(prevPage => prevPage + 1);
+            }
+        });
+        if (node) observer.current.observe(node);
+    }, [loading, hasMore]);
+
+    const fetchLogs = async (pageNum, isNewFilter = false) => {
+        setLoading(true);
         try {
-            const params = {};
+            const params = {
+                page: pageNum,
+                limit: 20 // Fetch 20 at a time for smooth scroll
+            };
             if (filters.severity) params.severity = filters.severity;
             if (filters.category) params.category = filters.category;
 
             const res = await api.get('/logs', { params });
             if (res.data.success) {
-                setLogs(res.data.data.logs);
+                const newLogs = res.data.data.logs;
+                setLogs(prev => {
+                    // Combine and remove duplicates based on _id/logId just in case
+                    const combined = isNewFilter ? newLogs : [...prev, ...newLogs];
+                    const unique = Array.from(new Map(combined.map(item => [item._id || item.logId, item])).values());
+                    return unique;
+                });
+                setHasMore(newLogs.length > 0 && newLogs.length >= params.limit);
             }
         } catch (error) {
             console.error("Failed to fetch logs", error);
+        } finally {
+            setLoading(false);
         }
     };
 
+    // Reset when filters change
     useEffect(() => {
-        fetchLogs();
+        setPage(1);
+        setLogs([]);
+        setHasMore(true);
+        fetchLogs(1, true);
     }, [filters]);
+
+    // Fetch on page change (except initial load which is covered above or if page is 1 and already fetched)
+    useEffect(() => {
+        if (page > 1) {
+            fetchLogs(page);
+        }
+    }, [page]);
 
     useEffect(() => {
         if (!socket) return;
 
         socket.on("NEW_LOG", (newLog) => {
-            // Apply client-side filtering if needed, or just prepend
-            // For strict filtering, we might need to check if newLog matches filters
-            setLogs(prev => [newLog, ...prev].slice(0, 50)); // Keep last 50
+            // Apply client-side filtering if needed
+            if (filters.severity && newLog.severity !== filters.severity) return;
+            if (filters.category && newLog.category !== filters.category) return;
+
+            setLogs(prev => {
+                // Prepend new log. Keep max list size reasonable if desired, or let it grow infinite
+                // "YouTube style" usually keeps growing downward, but real-time updates happen at the top.
+                // We'll just prepend.
+                const updated = [newLog, ...prev];
+                return updated;
+            });
         });
 
         return () => socket.off("NEW_LOG");
-    }, [socket]);
+    }, [socket, filters]);
 
     const getSeverityColor = (severity) => {
         switch (severity) {
@@ -89,20 +138,48 @@ const LiveLogs = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-700">
-                            {logs.map((log) => (
-                                <tr key={log._id || log.logId} onClick={() => setSelectedLog(log)} className="hover:bg-slate-700/50 cursor-pointer transition-colors">
-                                    <td className="px-6 py-4 text-slate-300">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                                    <td className="px-6 py-4 text-sky-400 font-mono">{log.sourceIP}</td>
-                                    <td className="px-6 py-4 text-white font-medium">{log.eventType}</td>
-                                    <td className="px-6 py-4 text-slate-400 max-w-xs truncate">{log.httpMethod} {log.endpoint}</td>
-                                    <td className={`px-6 py-4 ${getSeverityColor(log.severity)}`}>{log.severity}</td>
-                                    <td className="px-6 py-4">
-                                        <button className="text-blue-400 hover:underline">View</button>
-                                    </td>
-                                </tr>
-                            ))}
+                            {logs.map((log, index) => {
+                                // Attach ref to the last element
+                                const isLast = index === logs.length - 1;
+                                return (
+                                    <tr
+                                        key={log._id || log.logId}
+                                        ref={isLast ? lastLogElementRef : null}
+                                        onClick={() => setSelectedLog(log)}
+                                        className="hover:bg-slate-700/50 cursor-pointer transition-colors"
+                                    >
+                                        <td className="px-6 py-4 text-slate-300">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                                        <td className="px-6 py-4 text-sky-400 font-mono">{log.sourceIP}</td>
+                                        <td className="px-6 py-4 text-white font-medium">{log.eventType}</td>
+                                        <td className="px-6 py-4 text-slate-400 max-w-xs truncate">{log.httpMethod} {log.endpoint}</td>
+                                        <td className={`px-6 py-4 ${getSeverityColor(log.severity)}`}>{log.severity}</td>
+                                        <td className="px-6 py-4">
+                                            <button className="text-blue-400 hover:underline">View</button>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
                         </tbody>
                     </table>
+
+                    {/* Loading Indicator */}
+                    {loading && (
+                        <div className="p-4 flex justify-center text-slate-400 bg-slate-800/50">
+                            <Loader className="animate-spin mr-2" /> Loading more logs...
+                        </div>
+                    )}
+
+                    {!hasMore && logs.length > 0 && (
+                        <div className="p-4 text-center text-slate-500 text-xs uppercase tracking-widest bg-slate-800/30">
+                            End of Logs
+                        </div>
+                    )}
+
+                    {logs.length === 0 && !loading && (
+                        <div className="p-8 text-center text-slate-500">
+                            No logs found matching criteria.
+                        </div>
+                    )}
                 </div>
             </div>
 

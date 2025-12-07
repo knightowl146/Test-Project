@@ -4,6 +4,7 @@ import { useAuth } from '../utils/authContext';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { SocketProvider } from '../context/SocketContext';
 import { LayoutDashboard, ScrollText, AlertTriangle, LogOut, Activity, User, Menu, X } from 'lucide-react';
+import ChatWidget from '../components/Chatbot/ChatWidget';
 
 import socLogo from '../assets/soc-logo.png';
 
@@ -200,9 +201,12 @@ const DashboardLayout = () => {
                     </header>
 
                     {/* Scrollable Content */}
+                    {/* Scrollable Content */}
                     <main className="flex-1 overflow-auto bg-[#0B1120] relative scroll-smooth w-full">
                         <Outlet />
                     </main>
+
+                    <ChatWidget />
                 </div>
             </div>
         </SocketProvider>

@@ -3,6 +3,7 @@ import api from '../utils/api';
 import { useAuth } from '../utils/authContext';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Shield, FileText, Activity, Lock, BookOpen, AlertCircle, LogOut, Menu, X, Users, Settings } from 'lucide-react';
+import ChatWidget from '../components/Chatbot/ChatWidget';
 
 import socLogo from '../assets/soc-logo.png';
 
@@ -186,6 +187,8 @@ const AdminLayout = () => {
                 <main className="flex-1 overflow-auto bg-[#0B1120] relative scroll-smooth w-full p-8 text-white">
                     <Outlet />
                 </main>
+
+                <ChatWidget />
             </div>
         </div>
     );

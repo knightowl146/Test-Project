@@ -300,16 +300,17 @@ const Login = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
-            const { success, error } = await login(formData.identifier, formData.password, formData.role);
+            const trimmedIdentifier = formData.identifier.trim();
+            const { success, error } = await login(trimmedIdentifier, formData.password, formData.role);
             if (success) {
                 navigate("/");
             } else {
                 setError(error || "Invalid credentials");
-                navigate("/welcome");
+                // navigate("/welcome"); // REMOVED: Correct behavior is to stay on login page
             }
         } catch (err) {
             setError(err.message || "An unexpected error occurred");
-            navigate("/welcome");
+            // navigate("/welcome"); // REMOVED: Correct behavior is to stay on login page
         }
     };
 

@@ -9,12 +9,20 @@ dotenv.config({
 import { createServer } from "http";
 import { initSocket } from "./socket.js";
 import { startLogCleanup } from "./utils/cleanupService.js";
+import { seedKnowledgeBase } from "./services/rag.service.js";
 
 connectDB()
-    .then(() => {
+    .then(async () => {
         const server = createServer(app);
         initSocket(server);
         startLogCleanup();
+
+        // Seed RAG Data
+        try {
+            await seedKnowledgeBase();
+        } catch (err) {
+            console.error("Seeding Failed:", err);
+        }
 
         server.listen(process.env.PORT || 8000, () => {
             console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
