@@ -53,7 +53,7 @@ Here is a summary of how S.H.I.E.L.D meets the project requirements:
 
 ### Phase 1: Basic Functionalities (Must-Have)
 - [x] **Authentication & Access**: Secure login with JWT & RBAC (Admin/Analyst roles).
-- [x] **Log Ingestion**: Continuous auto-generated logs for XSS, SQLi, Port Scans.
+- [x] **Log Ingestion**: Continuous auto-generated logs for XSS, SQLi.
 - [x] **Threat Classification Engine**: Rule-driven analysis prioritizing high-risk patterns.
 - [x] **Incident Management**: Full lifecycle tracking (Open -> Resolved) with assignment.
 - [x] **Dashboards**: Real-time visualization of attack trends and severity distribution.
@@ -365,6 +365,15 @@ npm run dev
   <tr>
     <td><img src="https://github.com/user-attachments/assets/39bc3baf-6c0f-4179-aca6-d7f616dd77c9" width="500"/></td>
     <td><img src="https://github.com/user-attachments/assets/d672b70d-ef99-403f-b445-7a9f536cf1b0" width="500"/></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/1997ef93-79a8-43e5-a3b5-acdaa3f88891" width="500"/></td>
+    <td><img src="https://github.com/user-attachments/assets/6d2394c6-68ff-41a7-b8d0-b900b0bd43a4" width="500"/></td>
+    
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/ef9a71fe-0186-4698-bd12-0d9761c3f220" width="500"/></td>
+    <td><img src="https://github.com/user-attachments/assets/7a865785-2d24-4944-8cf3-14113371e56c" width="500"/></td>
   </tr>
 </table>
 
